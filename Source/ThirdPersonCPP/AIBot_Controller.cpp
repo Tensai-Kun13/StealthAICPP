@@ -10,11 +10,11 @@
 #include "ConstructorHelpers.h"
 #include "ThirdPersonCPPCharacter.h"
 #include "Perception/AISenseConfig_Sight.h"
-#include "Perception/AIPerceptionStimuliSourceComponent.h"
+#include "Perception/AISenseConfig_Hearing.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Kismet/GameplayStatics.h"
-#include "Engine/World.h"
-#include "GameFramework/Character.h"
+#include "AI_Tags.h"
+#include "Engine.h"
 
 AAIBot_Controller::AAIBot_Controller(FObjectInitializer const& ObjectInitializer)
 {
@@ -37,9 +37,9 @@ void AAIBot_Controller::BeginPlay()
 	BehaviorTreeComponent->StartTree(*BTree);
 }
 
-void AAIBot_Controller::OnPossess(APawn* const Pawn)
+void AAIBot_Controller::OnPossess(APawn* InPawn)
 {
-	Super::OnPossess(Pawn);
+	Super::OnPossess(InPawn);
 
 	if (Blackboard)
 	{
@@ -60,22 +60,61 @@ void AAIBot_Controller::OnTargetDetected(AActor* Actor, FAIStimulus const Stimul
 	}
 }
 
+void AAIBot_Controller::OnUpdated(TArray<AActor*> const& UpdatedActors)
+{
+	for (size_t i = 0; i < UpdatedActors.Num(); ++i)
+	{
+		FActorPerceptionBlueprintInfo Info;
+		GetPerceptionComponent()->GetActorsPerception(UpdatedActors[i], Info);
+		for (size_t j = 0; j < Info.LastSensedStimuli.Num(); ++j)
+		{
+			FAIStimulus const Stim = Info.LastSensedStimuli[j];
+			if (Stim.Tag == tags::noise_tag)
+			{
+				GetBlackboard()->SetValueAsBool(bb_keys::IsInvestigating, Stim.WasSuccessfullySensed());
+				GetBlackboard()->SetValueAsVector(bb_keys::TargetLocation, Stim.StimulusLocation);
+			}
+			else
+			{
+				GetBlackboard()->SetValueAsBool(bb_keys::CanSeePlayer, Stim.WasSuccessfullySensed());
+			}
+		}
+	}
+}
+
 void AAIBot_Controller::SetupPerceptionSystem()
 {
 	// create and initialise sight configuration object
 	SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("Sight Config"));
-	SetPerceptionComponent(*CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("Perception Component")));
-	SightConfig->SightRadius = 500.0f;
-	SightConfig->LoseSightRadius = SightConfig->SightRadius + 25.0f;
-	SightConfig->PeripheralVisionAngleDegrees = 45.0f;
-	SightConfig->SetMaxAge(5.0f);
-	SightConfig->AutoSuccessRangeFromLastSeenLocation = 520.0f;
-	SightConfig->DetectionByAffiliation.bDetectEnemies = true;
-	SightConfig->DetectionByAffiliation.bDetectFriendlies = true;
-	SightConfig->DetectionByAffiliation.bDetectNeutrals = true;
+	if (SightConfig)
+	{
+		SetPerceptionComponent(*CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("Perception Component")));
+		SightConfig->SightRadius = 500.0f;
+		SightConfig->LoseSightRadius = SightConfig->SightRadius + 25.0f;
+		SightConfig->PeripheralVisionAngleDegrees = 45.0f;
+		SightConfig->SetMaxAge(5.0f);
+		SightConfig->AutoSuccessRangeFromLastSeenLocation = 520.0f;
+		SightConfig->DetectionByAffiliation.bDetectEnemies = 
+			SightConfig->DetectionByAffiliation.bDetectFriendlies = 
+			SightConfig->DetectionByAffiliation.bDetectNeutrals = true;
 
-	// Add sight configuration component to perception component
-	GetPerceptionComponent()->SetDominantSense(*SightConfig->GetSenseImplementation());
-	GetPerceptionComponent()->OnTargetPerceptionUpdated.AddDynamic(this, &AAIBot_Controller::OnTargetDetected);
-	GetPerceptionComponent()->ConfigureSense(*SightConfig);
+		// Add sight configuration component to perception component
+		GetPerceptionComponent()->SetDominantSense(*SightConfig->GetSenseImplementation());
+		GetPerceptionComponent()->OnTargetPerceptionUpdated.AddDynamic(this, &AAIBot_Controller::OnTargetDetected);
+		GetPerceptionComponent()->ConfigureSense(*SightConfig);
+	}
+	
+	// create and initialise hearing configuration object
+	HearingConfig = CreateDefaultSubobject<UAISenseConfig_Hearing>(TEXT("Hearing Config"));
+	if(HearingConfig)
+	{
+		HearingConfig->HearingRange = 3000.0f;
+		HearingConfig->DetectionByAffiliation.bDetectEnemies = 
+			HearingConfig->DetectionByAffiliation.bDetectFriendlies = 
+			HearingConfig->DetectionByAffiliation.bDetectNeutrals = true;
+
+		// Add hearing configuration component to perception component
+		GetPerceptionComponent()->OnPerceptionUpdated.AddDynamic(this, &AAIBot_Controller::OnUpdated);
+		GetPerceptionComponent()->ConfigureSense(*HearingConfig);
+	}
 }

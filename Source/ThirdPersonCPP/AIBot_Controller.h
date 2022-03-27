@@ -17,8 +17,8 @@ class THIRDPERSONCPP_API AAIBot_Controller : public AAIController
 
 public:
 	AAIBot_Controller(FObjectInitializer const& ObjectInitializer = FObjectInitializer::Get());
-	void BeginPlay() override;
-	void OnPossess(APawn* const Pawn) override;
+	virtual void BeginPlay() override;
+	virtual void OnPossess(APawn* InPawn) override;
 	class UBlackboardComponent* GetBlackboard() const;
 
 private:
@@ -32,8 +32,13 @@ private:
 
 	class UAISenseConfig_Sight* SightConfig;
 
+	class UAISenseConfig_Hearing* HearingConfig;
+
 	UFUNCTION()
 	void OnTargetDetected(AActor* Actor, FAIStimulus const Stimulus);
+
+	UFUNCTION()
+	void OnUpdated(TArray<AActor*> const& UpdatedActors);
 
 	void SetupPerceptionSystem();
 };

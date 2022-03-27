@@ -10,4 +10,5 @@ namespace bb_keys
 	TCHAR const* const PatrolPathVector = TEXT("PatrolPathVector");
 	TCHAR const* const PatrolPathIndex = TEXT("PatrolPathIndex");
 	TCHAR const* const PlayerIsInRange = TEXT("PlayerIsInRange");
+	TCHAR const* const IsInvestigating = TEXT("IsInvestigating");
 }

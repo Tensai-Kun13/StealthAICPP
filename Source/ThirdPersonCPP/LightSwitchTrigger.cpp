@@ -18,7 +18,7 @@ ALightSwitchTrigger::ALightSwitchTrigger()
 
 	PointLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("Point Light"));
 	PointLight->Intensity = LightIntensity;
-	PointLight->bVisible = true;
+	// PointLight->bVisible = true;
 	PointLight->SetLightColor(FColor::Red);
 	RootComponent = PointLight;
 

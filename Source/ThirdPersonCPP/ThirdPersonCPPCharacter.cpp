@@ -1,7 +1,6 @@
 // Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
 #include "ThirdPersonCPPCharacter.h"
-
 #include "AI_Bot.h"
 #include "HeadMountedDisplayFunctionLibrary.h"
 #include "Camera/CameraComponent.h"
@@ -18,6 +17,7 @@
 #include "Engine.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
+#include "AI_Tags.h"
 #include "ThirdPersonCPPGameMode.h"
 
 //////////////////////////////////////////////////////////////////////////
@@ -42,6 +42,7 @@ AThirdPersonCPPCharacter::AThirdPersonCPPCharacter() : CurrentHealth(MaxHealth)
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 540.0f, 0.0f); // ...at this rotation rate
 	GetCharacterMovement()->JumpZVelocity = 600.f;
 	GetCharacterMovement()->AirControl = 0.2f;
+	GetCharacterMovement()->MaxWalkSpeed = 600.0f;
 
 	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
@@ -73,7 +74,7 @@ void AThirdPersonCPPCharacter::BeginPlay()
 	UMaterialInstanceDynamic* const MaterialInstance = UMaterialInstanceDynamic::Create(GetMesh()->GetMaterial(0), this);
 	if (MaterialInstance)
 	{
-		MaterialInstance->SetVectorParameterValue("BodyColor", FLinearColor(0.0f, 0.0f, 1.0f, 1.0f));
+		MaterialInstance->SetVectorParameterValue("BodyColor", FLinearColor(0.1f, 0.1f, 0.85f, 1.0f));
 		GetMesh()->SetMaterial(0, MaterialInstance);
 	}
 }
@@ -121,6 +122,10 @@ void AThirdPersonCPPCharacter::SetupPlayerInputComponent(class UInputComponent* 
 
 	// Bind DisplayRaycast event
 	PlayerInputComponent->BindAction("Raycast", IE_Pressed, this, &AThirdPersonCPPCharacter::DisplayRaycast);
+
+	// Bind Crouch event
+	PlayerInputComponent->BindAction("Crouch", IE_Pressed, this, &AThirdPersonCPPCharacter::StartCrouch);
+	PlayerInputComponent->BindAction("Crouch", IE_Released, this, &AThirdPersonCPPCharacter::StopCrouch);
 }
 
 void AThirdPersonCPPCharacter::OnResetVR()
@@ -225,6 +230,26 @@ void AThirdPersonCPPCharacter::DisplayRaycast()
 		// Prints debug message that the line trace did not hit an actor
 		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, FString::Printf(TEXT("You did not hit an actor")));
 	}
+}
+
+void AThirdPersonCPPCharacter::StartCrouch()
+{
+	GetCharacterMovement()->MaxWalkSpeed = 300.0f;
+	ACharacter::Crouch();
+
+	bIsCrouching = true;
+
+	PlayAnimMontage(StandToCrouch);
+}
+
+void AThirdPersonCPPCharacter::StopCrouch()
+{
+	GetCharacterMovement()->MaxWalkSpeed = 600.0f;
+	ACharacter::UnCrouch();
+
+	bIsCrouching = false;
+
+	PlayAnimMontage(CrouchToStand);
 }
 
 float AThirdPersonCPPCharacter::GetHealth() const

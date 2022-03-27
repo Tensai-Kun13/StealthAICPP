@@ -41,14 +41,22 @@ public:
 	UPROPERTY(EditAnywhere, Category = "MapCamera")
 	AActor* PlayerCamera;
 
+	// Crouch to Stand Anim Montage
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Animation")
+	UAnimMontage* CrouchToStand;
+
+	// Stand to Crouch Anim Montage
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Animation")
+	UAnimMontage* StandToCrouch;
+
+	// Determines if the character is currently crouching.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	bool bIsCrouching;
+
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
-
-	void ChangeCamera();
-
-	void DisplayRaycast();
 
 	// Getters and Setters for health etc.
 	float GetHealth() const;
@@ -85,6 +93,16 @@ protected:
 
 	/** Handler for when a touch input stops. */
 	void TouchStopped(ETouchIndex::Type FingerIndex, FVector Location);
+
+	/** Called for Map input */
+	void ChangeCamera();
+
+	/** Called for Raycast input */
+	void DisplayRaycast();
+
+	/** Called for Crouch input */
+	void StartCrouch();
+	void StopCrouch();
 
 	// APawn interface
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;

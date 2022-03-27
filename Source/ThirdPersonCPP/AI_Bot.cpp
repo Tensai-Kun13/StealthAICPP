@@ -39,7 +39,7 @@ void AAI_Bot::BeginPlay()
 	UMaterialInstanceDynamic* const material_instance = UMaterialInstanceDynamic::Create(GetMesh()->GetMaterial(0), this);
 	if (material_instance)
 	{
-		material_instance->SetVectorParameterValue("BodyColor", FLinearColor(1.0f, 0.0f, 0.0f, 1.0f));
+		material_instance->SetVectorParameterValue("BodyColor", FLinearColor(0.5f, 0.04f, 0.04f, 1.0f));
 		GetMesh()->SetMaterial(0, material_instance);
 	}
 
