@@ -74,10 +74,6 @@ void AAIBot_Controller::OnUpdated(TArray<AActor*> const& UpdatedActors)
 				GetBlackboard()->SetValueAsBool(bb_keys::IsInvestigating, Stim.WasSuccessfullySensed());
 				GetBlackboard()->SetValueAsVector(bb_keys::TargetLocation, Stim.StimulusLocation);
 			}
-			else
-			{
-				GetBlackboard()->SetValueAsBool(bb_keys::CanSeePlayer, Stim.WasSuccessfullySensed());
-			}
 		}
 	}
 }
@@ -89,7 +85,7 @@ void AAIBot_Controller::SetupPerceptionSystem()
 	if (SightConfig)
 	{
 		SetPerceptionComponent(*CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("Perception Component")));
-		SightConfig->SightRadius = 500.0f;
+		SightConfig->SightRadius = 600.0f;
 		SightConfig->LoseSightRadius = SightConfig->SightRadius + 25.0f;
 		SightConfig->PeripheralVisionAngleDegrees = 45.0f;
 		SightConfig->SetMaxAge(5.0f);
@@ -108,7 +104,7 @@ void AAIBot_Controller::SetupPerceptionSystem()
 	HearingConfig = CreateDefaultSubobject<UAISenseConfig_Hearing>(TEXT("Hearing Config"));
 	if(HearingConfig)
 	{
-		HearingConfig->HearingRange = 3000.0f;
+		HearingConfig->HearingRange = 1000.0f;
 		HearingConfig->DetectionByAffiliation.bDetectEnemies = 
 			HearingConfig->DetectionByAffiliation.bDetectFriendlies = 
 			HearingConfig->DetectionByAffiliation.bDetectNeutrals = true;
