@@ -100,6 +100,9 @@ protected:
 	/** Called for Raycast input */
 	void DisplayRaycast();
 
+	/** Called for Cover input */
+	void WallTrace();
+
 	/** Called for Crouch input */
 	void StartCrouch();
 	void StopCrouch();
@@ -111,9 +114,16 @@ protected:
 private:
 	float const MaxHealth = 100.0f;
 	float CurrentHealth;
+	bool bIsInCover;
 
 	class UAIPerceptionStimuliSourceComponent* Stimulus;
 
 	void SetupStimulus();
+
+	void StartCover(FVector PlaneNormal);
+
+	void StopCover();
+
+	void CoverTrace(FVector Direction, float Value);
 };
 

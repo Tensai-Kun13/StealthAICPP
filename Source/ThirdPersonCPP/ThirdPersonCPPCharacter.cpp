@@ -11,14 +11,18 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Engine/World.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/ArrowComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetSystemLibrary.h"
 #include "Engine.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "AI_Tags.h"
+#include "CoverVolume.h"
 #include "ThirdPersonCPPGameMode.h"
+#include "Kismet/KismetMathLibrary.h"
 
 //////////////////////////////////////////////////////////////////////////
 // AThirdPersonCPPCharacter
@@ -43,6 +47,7 @@ AThirdPersonCPPCharacter::AThirdPersonCPPCharacter() : CurrentHealth(MaxHealth)
 	GetCharacterMovement()->JumpZVelocity = 600.f;
 	GetCharacterMovement()->AirControl = 0.2f;
 	GetCharacterMovement()->MaxWalkSpeed = 600.0f;
+	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
 
 	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
@@ -123,6 +128,9 @@ void AThirdPersonCPPCharacter::SetupPlayerInputComponent(class UInputComponent* 
 	// Bind DisplayRaycast event
 	PlayerInputComponent->BindAction("Raycast", IE_Pressed, this, &AThirdPersonCPPCharacter::DisplayRaycast);
 
+	// Bind Cover event
+	PlayerInputComponent->BindAction("Cover", IE_Pressed, this, &AThirdPersonCPPCharacter::WallTrace);
+
 	// Bind Crouch event
 	PlayerInputComponent->BindAction("Crouch", IE_Pressed, this, &AThirdPersonCPPCharacter::StartCrouch);
 	PlayerInputComponent->BindAction("Crouch", IE_Released, this, &AThirdPersonCPPCharacter::StopCrouch);
@@ -180,7 +188,16 @@ void AThirdPersonCPPCharacter::MoveRight(float Value)
 		// get right vector 
 		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 		// add movement in that direction
-		AddMovementInput(Direction, Value);
+		// AddMovementInput(Direction, Value);
+
+		if (bIsInCover)
+		{
+			CoverTrace(Direction, Value);
+		}
+		else
+		{
+			AddMovementInput(Direction, Value);
+		}
 	}
 }
 
@@ -217,7 +234,7 @@ void AThirdPersonCPPCharacter::DisplayRaycast()
 	if (GetWorld()->LineTraceSingleByChannel(*HitResult, StartTrace, EndTrace, ECC_Visibility, *TraceParams))
 	{
 		// Draws a red debug line on screen that persists
-		DrawDebugLine(GetWorld(), StartTrace, EndTrace, FColor(255, 0, 0), true);
+		DrawDebugLine(GetWorld(), StartTrace, EndTrace, FColor(0, 255, 0), true);
 
 		// Prints "You hit: (actor name)" as engine screen debug message
 		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, FString::Printf(TEXT("You hit: %s"), *HitResult->Actor->GetName()));
@@ -229,6 +246,26 @@ void AThirdPersonCPPCharacter::DisplayRaycast()
 
 		// Prints debug message that the line trace did not hit an actor
 		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, FString::Printf(TEXT("You did not hit an actor")));
+	}
+}
+
+void AThirdPersonCPPCharacter::WallTrace()
+{
+	// Instantiate variables
+	FHitResult* HitResult = new FHitResult();
+	FVector StartTrace = GetActorLocation();
+	FVector ForwardVector = FollowCamera->GetForwardVector();
+	FVector EndTrace = ((ForwardVector * 100.0f) + StartTrace);
+	FCollisionQueryParams* TraceParams = new FCollisionQueryParams();
+
+	// checks the hit result starts cover
+	if (GetWorld()->LineTraceSingleByChannel(*HitResult, StartTrace, EndTrace, ECC_GameTraceChannel3, *TraceParams))
+	{
+		StartCover(HitResult->Normal);
+	}
+	else
+	{
+		StopCover();
 	}
 }
 
@@ -277,4 +314,91 @@ void AThirdPersonCPPCharacter::SetupStimulus()
 	Stimulus = CreateDefaultSubobject<UAIPerceptionStimuliSourceComponent>(TEXT("Stimulus"));
 	Stimulus->RegisterForSense(TSubclassOf<UAISense_Sight>());
 	Stimulus->RegisterWithPerceptionSystem();
+}
+
+void AThirdPersonCPPCharacter::StartCover(FVector PlaneNormal)
+{
+	GetCharacterMovement()->SetPlaneConstraintEnabled(true);
+	GetCharacterMovement()->SetPlaneConstraintNormal(PlaneNormal);
+	bUseControllerRotationYaw = false;
+
+	bIsInCover = true;
+	StartCrouch();
+}
+
+void AThirdPersonCPPCharacter::StopCover()
+{
+	GetCharacterMovement()->SetPlaneConstraintEnabled(false);
+	bUseControllerRotationYaw = true;
+
+	bIsInCover = false;
+	StopCrouch();
+}
+
+void AThirdPersonCPPCharacter::CoverTrace(FVector Direction, float Value)
+{
+	FCollisionQueryParams* TraceParams = new FCollisionQueryParams();
+	
+	// Right-hand side trace
+	FHitResult* RightHitResult = new FHitResult();
+	FVector RightPlaneConstraint = GetCharacterMovement()->GetPlaneConstraintNormal();
+	FRotator RightXRotation = UKismetMathLibrary::MakeRotFromX(RightPlaneConstraint);
+	FVector RightVector = UKismetMathLibrary::GetRightVector(RightXRotation);
+	FVector RightStartTrace = GetActorLocation() + (RightVector * 45.0f);
+	FVector RightEndTrace = (RightPlaneConstraint * 1.0f * 200.0f) + RightStartTrace;
+	bool bRightHit = GetWorld()->LineTraceSingleByChannel(*RightHitResult, RightStartTrace, RightEndTrace, ECC_GameTraceChannel3, *TraceParams);
+	
+	// Left-hand side trace
+	FHitResult* LeftHitResult = new FHitResult();
+	FVector LeftPlaneConstraint = GetCharacterMovement()->GetPlaneConstraintNormal();
+	FRotator LeftXRotation = UKismetMathLibrary::MakeRotFromX(LeftPlaneConstraint);
+	FVector LeftVector = UKismetMathLibrary::GetRightVector(LeftXRotation);
+	FVector LeftStartTrace = GetActorLocation() + (LeftVector * 45.0f);
+	FVector LeftEndTrace = (LeftPlaneConstraint * 1.0f * 200.0f) + RightStartTrace;
+	bool bLeftHit = GetWorld()->LineTraceSingleByChannel(*LeftHitResult, LeftStartTrace, LeftEndTrace, ECC_GameTraceChannel3, *TraceParams);
+	
+	if (bRightHit && bLeftHit)
+	{
+		if (Value != 0.0f)
+		{
+			// Instantiate variables  
+			FHitResult* HitResult = new FHitResult();  
+			FVector StartTrace = GetActorLocation();
+			FVector EndTrace = (((GetCharacterMovement()->GetPlaneConstraintNormal() * -1.0f) * 200.0f) + StartTrace);  
+	
+			if (GetWorld()->LineTraceSingleByChannel(*HitResult, StartTrace, EndTrace, ECC_GameTraceChannel3, *TraceParams))
+			{
+				GetCharacterMovement()->SetPlaneConstraintNormal(HitResult->Normal);
+				AddMovementInput(Direction, Value);
+	
+			}
+		}
+	}
+	else
+	{
+		if (Value == 1.0f)
+		{
+			if (bRightHit && Value != 0.0f)
+			{
+				AddMovementInput(Direction, Value);
+			}
+			else
+			{
+				Value = 0.0f;
+				AddMovementInput(Direction, Value);
+			}
+		}
+		else
+		{
+			if (bLeftHit && Value != 0.0f)
+			{
+				AddMovementInput(Direction, Value);
+			}
+			else
+			{
+				Value = 0.0f;
+				AddMovementInput(Direction, Value);
+			}
+		}
+	}
 }
